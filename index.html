@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>16:8 Böjtkövető</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0b0f;--card:#15151b;--text:#f5f5f7;--muted:#a1a1aa;--line:#292932;--accent:#7cdb8a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
+main{max-width:520px;margin:auto;padding:28px 20px 40px}.top{text-align:center}.eyebrow{font-size:13px;color:var(--muted);letter-spacing:.14em;font-weight:700}.title{font-size:28px;font-weight:750;margin:7px 0 0}
+.ringWrap{position:relative;width:min(88vw,360px);aspect-ratio:1;margin:25px auto}.ring{width:100%;height:100%;transform:rotate(-90deg)}circle{fill:none}.track{stroke:var(--line);stroke-width:18}.progress{stroke:var(--accent);stroke-width:18;stroke-linecap:round;transition:stroke-dashoffset .35s linear}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}.phase{font-size:15px;letter-spacing:.15em;font-weight:800}.time{font-size:42px;font-weight:700;letter-spacing:-.045em;font-variant-numeric:tabular-nums;margin-top:8px}.next{font-size:14px;color:var(--muted);margin-top:7px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}.label{font-size:13px;color:var(--muted)}.value{font-size:21px;font-weight:700;margin-top:6px}
+.panel{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:17px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:15px}.row+.row{margin-top:15px}label{font-size:15px;font-weight:650}select,input,button{font:inherit}select,input{background:#0f0f14;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:16px}button{border:0;border-radius:13px;padding:12px 16px;font-weight:750;background:var(--accent);color:#071008;min-height:44px}.secondary{background:#22222a;color:var(--text)}.hint{text-align:center;color:var(--muted);font-size:13px;line-height:1.45;margin-top:15px}
+@media(max-width:360px){main{padding:22px 14px}.time{font-size:34px}.title{font-size:25px}}
+</style>
+</head>
+<body>
+<main>
+<section class="top">
+<div class="eyebrow">IDŐSZAKOS BÖJT</div><div class="title">16:8 Böjtkövető</div>
+<div class="ringWrap">
+<svg class="ring" viewBox="0 0 220 220"><circle class="track" cx="110" cy="110" r="86"/><circle id="progress" class="progress" cx="110" cy="110" r="86"/></svg>
+<div class="center"><div id="phase" class="phase">BÖJTÖLSZ</div><div id="time" class="time">16:00:00</div><div id="next" class="next">Következő váltás: --:--</div></div>
+</div>
+</section>
+<section class="grid">
+<div class="card"><div class="label">Böjt vége</div><div id="fastEnd" class="value">08:00</div></div>
+<div class="card"><div class="label">Étkezési ablak</div><div id="eatWindow" class="value">08:00–16:00</div></div>
+</section>
+<section class="panel">
+<div class="row"><label for="ratio">Böjtölési mód</label><select id="ratio"><option value="16:8">16:8</option><option value="14:10">14:10</option><option value="18:6">18:6</option><option value="20:4">20:4</option></select></div>
+<div class="row"><label for="start">Böjt kezdete</label><input id="start" type="time" value="20:00"></div>
+<div class="row"><button id="apply">Beállítás mentése</button><button id="now" class="secondary" type="button">Most indul</button></div>
+</section>
+<div id="status" class="hint" aria-live="polite"></div>
+<div class="hint">Tipp: Safariban a Megosztás → Főképernyőhöz adás paranccsal appként telepíthető.</div>
+</main>
+<script>
+(()=>{const $=id=>document.getElementById(id), ring=$('progress');const C=2*Math.PI*86;ring.style.strokeDasharray=C;
+let cfg=JSON.parse(localStorage.getItem('fast16cfg')||'null')||{fast:16,eat:8,start:'20:00'};
+function parseStart(){const [h,m]=cfg.start.split(':').map(Number);const now=new Date();const d=new Date(now);d.setHours(h,m,0,0);return d}
+function cycleStart(){let d=parseStart(),now=new Date();if(d>now)d.setDate(d.getDate()-1);return d}
+function fmt(ms){let s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return [h,m,x].map((v,i)=>String(v).padStart(2,'0')).join(':')}
+function hm(d){return d.toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'})}
+function render(){let start=cycleStart(),now=new Date(),fastMs=cfg.fast*3600000,eatMs=cfg.eat*3600000,total=fastMs+eatMs,elapsed=now-start;while(elapsed>=total){start=new Date(start.getTime()+total);elapsed=now-start}
+let fasting=elapsed<fastMs,duration=fasting?fastMs:eatMs,within=fasting?elapsed:elapsed-fastMs,left=duration-within;
+ring.style.strokeDashoffset=C*(1-Math.min(1,within/duration));$('phase').textContent=fasting?'BÖJTÖLSZ':'EHETSZ';$('time').textContent=fmt(left);
+let change=new Date(now.getTime()+left);$('next').textContent='Következő váltás: '+hm(change);
+let end=new Date(start.getTime()+fastMs);$('fastEnd').textContent=hm(end);$('eatWindow').textContent=hm(end)+'–'+hm(new Date(start.getTime()+total));
+$('status').textContent=fasting?'Jelenleg böjtölsz. Következő étkezési ablak: '+hm(end)+'.':'Jelenleg az étkezési ablakban vagy. A böjt '+hm(new Date(start.getTime()+total))+'-kor kezdődik.'}
+function load(){let [f,e]=($('ratio').value||'16:8').split(':').map(Number);cfg={fast:f,eat:e,start:$('start').value||'20:00'};localStorage.setItem('fast16cfg',JSON.stringify(cfg));render()}
+$('ratio').value=cfg.fast+':'+cfg.eat;$('start').value=cfg.start;$('apply').onclick=load;$('now').onclick=()=>{const d=new Date();cfg.start=hm(d);localStorage.setItem('fast16cfg',JSON.stringify(cfg));$('start').value=cfg.start;render()};render();setInterval(render,1000);
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body></html>
